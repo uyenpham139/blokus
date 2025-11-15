@@ -2,8 +2,6 @@ import pieces, constants, board, numpy as np
 
 class Player:
     
-    players = [constants.PLAYER1_VALUE, constants.PLAYER2_VALUE]
-    
     def __init__(self, player_number: int, color: list, is_ai: bool, ai_name = None, ai_class = None):
         self.number = player_number
         self.remaining_pieces = pieces.get_pieces()
@@ -20,9 +18,6 @@ class Player:
 
     def update_score(self):
         self.score = board.scoring_fn(self.remaining_pieces)
-    
-    """def set_current_piece(self, piece_name):
-        self.current_piece = {"piece": piece_name, "arr": pieces.get_pieces()[piece_name]}"""
     
     def empty_current_piece(self):
         self.current_piece = {"piece": "", "arr": [], "rotated": 0, "flipped": 0, "rects": [], "place_on_board_at": []}
@@ -96,8 +91,4 @@ class Player:
         for piece_name in initial_piece_names:
             if piece_name not in self.remaining_pieces:
                 self.discarded_pieces.append({"piece": piece_name})
-
-def switch_active_player(active_player, opponent):
-    if constants.VERBOSITY > 0:
-        print("Player number %d is now active" % opponent.number)
-    return opponent, active_player
+                

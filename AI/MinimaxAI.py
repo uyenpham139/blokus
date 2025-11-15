@@ -1,6 +1,6 @@
 import copy
 import board, pieces, constants
-from AI.cost_function import GreedyEvaluate
+from .cost_function.GreedyEvaluate import main as GreedyEvaluate
 
 class Minimax:
     def __init__(self, player_color, player_number, depth=2):
@@ -13,8 +13,9 @@ class Minimax:
         return best_move
 
     def minimax_alpha_beta(self, gameboard, player, opponent, depth, alpha, beta, maximizing_player):
-        if depth == 0 or board.is_game_over(gameboard, player, opponent):
-            return GreedyEvaluate.main(gameboard, player, opponent), None
+        players_list = [player, opponent]
+        if depth == 0 or board.is_game_over(gameboard, players_list):
+            return GreedyEvaluate(gameboard, player, opponent), None
 
         if maximizing_player:
             max_eval = constants.M_INFINITY
@@ -27,8 +28,8 @@ class Minimax:
                 gameboard_copy = copy.deepcopy(gameboard)
                 player_copy = copy.deepcopy(player)
                 opponent_copy = copy.deepcopy(opponent)
-
-                if gameboard_copy.fit_piece(move, player_copy, opponent_copy, mode="ai"):
+                
+                if gameboard_copy.fit_piece(move, player_copy, [player_copy, opponent_copy]):
                     evaluation, _ = self.minimax_alpha_beta(gameboard_copy, player_copy, opponent_copy, depth - 1, alpha, beta, False)
                     if evaluation > max_eval:
                         max_eval = evaluation
@@ -37,7 +38,7 @@ class Minimax:
                     if beta <= alpha:
                         break
             return max_eval, best_move
-        else:  # Minimizing player
+        else: 
             min_eval = constants.INFINITY
             best_move = None
             possible_moves = board.return_all_pending_moves(gameboard, opponent)
@@ -49,7 +50,7 @@ class Minimax:
                 player_copy = copy.deepcopy(player)
                 opponent_copy = copy.deepcopy(opponent)
 
-                if gameboard_copy.fit_piece(move, opponent_copy, player_copy, mode="ai"):
+                if gameboard_copy.fit_piece(move, opponent_copy, [player_copy, opponent_copy]):
                     evaluation, _ = self.minimax_alpha_beta(gameboard_copy, player_copy, opponent_copy, depth - 1, alpha, beta, True)
                     if evaluation < min_eval:
                         min_eval = evaluation

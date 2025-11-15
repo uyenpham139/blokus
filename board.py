@@ -2,156 +2,150 @@ import numpy as np
 import constants, pieces
 
 empty = constants.BOARD_FILL_VALUE
-rows = constants.ROW_COUNT
-cols = constants.COLUMN_COUNT
 
 class Board:
-
-    def __init__(self):
-        self.board = np.array([[empty for i in range(rows)] for j in range(cols)])
-        self.turn_number = 1
     
-    def fit_piece(self, piece, player, opponent_player, mode="player"):
-        piece_x_rng = range(piece["arr"].shape[0])
-        piece_y_rng = range(piece["arr"].shape[1])
-        board_x_rng = range(piece["place_on_board_at"][0], rows)
-        board_y_rng = range(piece["place_on_board_at"][1], cols)
+    def __init__(self, rows=constants.ROW_COUNT_2P, cols=constants.COLUMN_COUNT_2P):
+        self.rows = rows
+        self.cols = cols
+        self.board = np.array([[constants.BOARD_FILL_VALUE for i in range(rows)] for j in range(cols)])
+        self.turn_number = 1
+        self.start_points = constants.get_start_points(rows, cols)
+    
+    def fit_piece(self, piece_data, player, players_list=None):
+        """
+        piece_data: dict containing "arr" and "place_on_board_at"
+        player: the player object placing the piece
+        players_list: list of all players (to update their corners)
+        """
+        piece_arr = piece_data["arr"]
+        pos_coords = piece_data["place_on_board_at"]
         
+        piece_x_rng = range(piece_arr.shape[0])
+        piece_y_rng = range(piece_arr.shape[1])
+        board_x_rng = range(pos_coords[0], self.rows)
+        board_y_rng = range(pos_coords[1], self.cols)
+        
+        # 1. HANDLE FIRST MOVE (Dynamic Start Points)
         if player.is_1st_move:
-            if player.number == constants.PLAYER1_VALUE:
-                pos = constants.STARTING_PTS["player1"]
-            elif player.number == constants.PLAYER2_VALUE:
-                pos = constants.STARTING_PTS["player2"]
+            # Get start point for this specific player number (1-4)
+            target_pos = self.start_points[player.number]
             
             is_within_starting_pos = False
             for i, x in zip(piece_x_rng, board_x_rng):
                 for j, y in zip(piece_y_rng, board_y_rng):
-                    if [x, y] == pos and piece["arr"][i][j] == 1:
+                    if [x, y] == target_pos and piece_arr[i][j] == 1:
                         is_within_starting_pos = True
+            
             if is_within_starting_pos:
                 for i, x in zip(piece_x_rng, board_x_rng):
                     for j, y in zip(piece_y_rng, board_y_rng):
-                        if piece["arr"][i][j] == 1 and self.board[x][y] == empty:
-                            self.board[x][y] = player.number * piece["arr"][i][j]
+                        if piece_arr[i][j] == 1 and self.board[x][y] == empty:
+                            self.board[x][y] = player.number * piece_arr[i][j]
             else:
                 if constants.VERBOSITY > 0:
-                    print("Piece %s placed at %s wasn't fit in the 1st turn" \
-                         % (piece["piece"], piece["place_on_board_at"]))
+                    print(f"Piece placed at {pos_coords} didn't cover start point {target_pos}")
                 return False    
-            if mode=="player":
-                player.is_1st_move = False
+            player.is_1st_move = False
+
+        # 2. HANDLE REGULAR MOVES
         else:
-            if self.check_is_move_valid(piece["arr"], player, piece["place_on_board_at"]):
+            if self.check_is_move_valid(piece_arr, player, pos_coords):
                 for i, x in zip(piece_x_rng, board_x_rng):
                     for j, y in zip(piece_y_rng, board_y_rng):
-                        if piece["arr"][i][j] == 1:
-                            self.board[x][y] = player.number * piece["arr"][i][j]
+                        if piece_arr[i][j] == 1:
+                            self.board[x][y] = player.number * piece_arr[i][j]
             else:
                 if constants.VERBOSITY > 0:
-                    print("In fit_piece, a move with piece %s turned out to be invalid" % (piece))
+                    print("Invalid move attempted in fit_piece")
                 return False
-        if constants.VERBOSITY > 0 and not player.is_ai:
-            print("Piece that was successfully fit:", piece)
-        player.discard_piece(piece)
+
+        piece_name = piece_data.get("piece_name")
+        if not piece_name:
+            piece_name = piece_data.get("piece")
+
+        piece_info = {"piece": piece_name, 
+                      "arr": piece_arr, 
+                      "place_on_board_at": pos_coords}
+        
+        player.discard_piece(piece_info)
         player.empty_current_piece()
         self.turn_number += 1
         player.turn_number += 1
         player.update_score()
-        if constants.VERBOSITY > 0:
-            print("After turn number %s board is:\n %s" % (self.turn_number - 1, self.board))
-            print("Current player's (Player %s) score is: %s and opponent's (Player %s) score is: %s" % \
-                 (player.number, player.score, opponent_player.number, opponent_player.score))
-        #self.update_board_corners(player, opponent_player)
-        self.optimised_update_board_corners(piece, player, opponent_player)
+        
+        target_players = players_list if players_list else [player]
+        self.optimised_update_board_corners(piece_info, target_players)
+        
         return True
     
-    def unfit_last_piece(self, player, opponent_player):
+    def unfit_last_piece(self, player, players_list):
         piece = player.retrieve_last_piece()
 
         piece_x_rng = range(piece["arr"].shape[0])
         piece_y_rng = range(piece["arr"].shape[1])
-        board_x_rng = range(piece["place_on_board_at"][0], rows)
-        board_y_rng = range(piece["place_on_board_at"][1], cols)
+        board_x_rng = range(piece["place_on_board_at"][0], self.rows)
+        board_y_rng = range(piece["place_on_board_at"][1], self.cols)
 
         for i, x in zip(piece_x_rng, board_x_rng):
             for j, y in zip(piece_y_rng, board_y_rng):
                 if piece["arr"][i][j] == 1:
                     self.board[x][y] = empty
+        
         self.turn_number -= 1
         player.turn_number -= 1
         player.update_score()
-        self.update_board_corners(player, opponent_player)
-        if constants.VERBOSITY > 1:
-            print("Piece %s has been removed from the board" % (piece["piece_name"]))
+        
+        self.update_board_corners(players_list)
     
-    """We check the corners of a certain coordinate on the board as such:
-    tl   0   tr
-    0  (x,y) 0
-    bl   0   br
-    """
-    def update_board_corners(self, player, opponent_player):
-        player.board_corners = {"bl":[],"br":[],"tl":[],"tr":[]}
-        opponent_player.board_corners = {"bl":[],"br":[],"tl":[],"tr":[]}
-        for p in [player, opponent_player]:
-            for x in range(self.board.shape[0]):
-                for y in range(self.board.shape[1]):
+    def update_board_corners(self, players_list):
+        """Full scan update for all players in list."""
+        for p in players_list:
+            p.board_corners = {"bl":[],"br":[],"tl":[],"tr":[]}
+            for x in range(self.rows):
+                for y in range(self.cols):
                     if self.board[x][y] == p.number:
                         tl, tr, bl, br = self.check_surrounding_piece_coords(x, y, p.number)
                         if tl and x-1 >= 0 and y-1 >= 0:
                             p.board_corners["tl"].append([x-1, y-1])
-                        if bl and x+1 < rows and y-1 >= 0:
+                        if bl and x+1 < self.rows and y-1 >= 0:
                             p.board_corners["bl"].append([x+1, y-1])
-                        if tr and x-1 >= 0 and y+1 < cols:
+                        if tr and x-1 >= 0 and y+1 < self.cols:
                             p.board_corners["tr"].append([x-1, y+1])
-                        if br and x+1 < rows and y+1 < cols:
+                        if br and x+1 < self.rows and y+1 < self.cols:
                             p.board_corners["br"].append([x+1,y+1])
-        if constants.VERBOSITY > 0:
-            print("Board corners for current player (Player %s): %s" % (player.number, player.board_corners))
-            print("Board corners for opponent player (Player %s): %s" % (opponent_player.number, opponent_player.board_corners))
     
-    def optimised_update_board_corners(self, piece_played, player, opponent_player):
+    def optimised_update_board_corners(self, piece_played, players_list):
+        """Updates corners relative to the specific piece placed."""
         b_x_low, b_y_low = piece_played["place_on_board_at"][0], piece_played["place_on_board_at"][1]
-        b_x_high, b_y_high = b_x_low + piece_played["arr"].shape[0], b_y_low + piece_played["arr"].shape[1]
+        b_x_high = b_x_low + piece_played["arr"].shape[0]
+        b_y_high = b_y_low + piece_played["arr"].shape[1]
+        
         x_low = 0 if b_x_low == 0 else b_x_low - 1
         y_low = 0 if b_y_low == 0 else b_y_low - 1
-        x_high = rows if b_x_high >= rows else b_x_high + 1
-        y_high = cols if b_y_high >= cols else b_y_high + 1
+        x_high = self.rows if b_x_high >= self.rows else b_x_high + 1
+        y_high = self.cols if b_y_high >= self.cols else b_y_high + 1
 
-        for p in [player, opponent_player]:
+        for p in players_list:
             for x in range(x_low, x_high):
                 for y in range(y_low, y_high):
                     if self.board[x][y] == p.number:
                         tl, tr, bl, br = self.check_surrounding_piece_coords(x, y, p.number)
-                        if tl and x-1 >= 0 and y-1 >= 0:
-                            if [x-1, y-1] not in p.board_corners["tl"]:
-                                p.board_corners["tl"].append([x-1, y-1])
-                        elif not tl and x-1 >= 0 and y-1 >= 0:
-                            if [x-1, y-1] in p.board_corners["tl"]:
-                                p.board_corners["tl"].remove([x-1, y-1])
                         
-                        if bl and x+1 < rows and y-1 >= 0:
-                            if [x+1, y-1] not in p.board_corners["bl"]:
-                                p.board_corners["bl"].append([x+1, y-1])
-                        elif not bl and x+1 < rows and y-1 >= 0:
-                            if [x+1, y-1] in p.board_corners["bl"]:
-                                p.board_corners["bl"].remove([x+1, y-1])
-                        
-                        if tr and x-1 >= 0 and y+1 < cols:
-                            if [x-1, y+1] not in p.board_corners["tr"]:
-                                p.board_corners["tr"].append([x-1, y+1])
-                        elif not tr and x-1 >= 0 and y+1 < cols:
-                            if [x-1, y+1] in p.board_corners["tr"]:
-                                p.board_corners["tr"].remove([x-1, y+1])
-                        
-                        if br and x+1 < rows and y+1 < cols:
-                            if [x+1, y+1] not in p.board_corners["br"]:
-                                p.board_corners["br"].append([x+1,y+1])
-                        elif not br and x+1 < rows and y+1 < cols:
-                            if [x+1, y+1] in p.board_corners["br"]:
-                                p.board_corners["br"].remove([x+1,y+1])
-        if constants.VERBOSITY > 0:
-            print("Board corners for current player (Player %s): %s" % (player.number, player.board_corners))
-            print("Board corners for opponent player (Player %s): %s" % (opponent_player.number, opponent_player.board_corners))
+                        def update_corner(condition, c_list, coord):
+                            if condition:
+                                if coord not in c_list: c_list.append(coord)
+                            else:
+                                if coord in c_list: c_list.remove(coord)
+
+                        if x-1 >= 0 and y-1 >= 0:
+                            update_corner(tl, p.board_corners["tl"], [x-1, y-1])
+                        if x+1 < self.rows and y-1 >= 0:
+                            update_corner(bl, p.board_corners["bl"], [x+1, y-1])
+                        if x-1 >= 0 and y+1 < self.cols:
+                            update_corner(tr, p.board_corners["tr"], [x-1, y+1])
+                        if x+1 < self.rows and y+1 < self.cols:
+                            update_corner(br, p.board_corners["br"], [x+1, y+1])
     
     def check_surrounding_piece_coords(self, x, y, p_num):
         tl, tr, bl, br = True, True, True, True
@@ -159,19 +153,20 @@ class Board:
             if x-1 >= 0 and self.board[x-1][y+1] != empty: tr = False
         except IndexError: tr = False
         try:
-            if self.board[x+1][y+1] != empty: br = False
+            if x+1 < self.rows and y+1 < self.cols and self.board[x+1][y+1] != empty: br = False
         except IndexError: br = False
         try:
-            if y-1 >= 0 and self.board[x+1][y-1] != empty: bl = False
+            if y-1 >= 0 and x+1 < self.rows and self.board[x+1][y-1] != empty: bl = False
         except IndexError: bl = False
         try:
             if x-1 >= 0 and y-1 >= 0 and self.board[x-1][y-1] != empty: tl = False
         except IndexError: tl = False
+        
         try:
-            if self.board[x][y+1] == p_num: tr, br = False, False
+            if y+1 < self.cols and self.board[x][y+1] == p_num: tr, br = False, False
         except IndexError: tr, br = False, False
         try:
-            if self.board[x+1][y] == p_num: bl, br = False, False
+            if x+1 < self.rows and self.board[x+1][y] == p_num: bl, br = False, False
         except IndexError: bl, br = False, False
         try:
             if y-1 >= 0 and self.board[x][y-1] == p_num: tl, bl = False, False
@@ -179,6 +174,7 @@ class Board:
         try:
             if x-1 >= 0 and self.board[x-1][y] == p_num: tl, tr = False, False
         except IndexError: tl, tr = False, False
+        
         return tl, tr, bl, br
     
     def check_is_move_valid(self, piece_arr, player, coords):
@@ -187,10 +183,11 @@ class Board:
         
         piece_x_rng = range(piece_arr.shape[0])
         piece_y_rng = range(piece_arr.shape[1])
-        board_x_rng = range(coords[0], rows)
-        board_y_rng = range(coords[1], cols)
-        if piece_arr.shape[0] + coords[0] > rows\
-           or piece_arr.shape[1] + coords[1] > cols:
+        board_x_rng = range(coords[0], self.rows)
+        board_y_rng = range(coords[1], self.cols)
+        
+        if piece_arr.shape[0] + coords[0] > self.rows\
+           or piece_arr.shape[1] + coords[1] > self.cols:
            return False
 
         for i, x in zip(piece_x_rng, board_x_rng):
@@ -202,7 +199,7 @@ class Board:
                             if [x, y] in player.board_corners[b]:
                                 is_corner_exists = True
                     for a, b in zip([x, x, x-1, x+1], [y-1, y+1, y, y]):
-                        if a < 0 or b < 0 or a >= rows or b >= cols:
+                        if a < 0 or b < 0 or a >= self.rows or b >= self.cols:
                             pass
                         else:
                             if self.board[a][b] == player.number:
@@ -215,8 +212,8 @@ class Board:
     
     def validate_and_return_move_positions(self, piece_arr, player):
         place_on_board_at = []
-        for x in range(self.board.shape[0]):
-            for y in range(self.board.shape[1]):
+        for x in range(self.rows):
+            for y in range(self.cols):
                 if self.board[x][y] == empty:
                     if self.check_is_move_valid(piece_arr, player, [x,y]):
                         place_on_board_at.append([x,y])
@@ -255,7 +252,8 @@ def return_all_pending_moves(gameboard, player, mode = "ai"):
     pending_moves_list = []
 
     if player.is_1st_move:
-        start_x, start_y = constants.STARTING_PTS["player%s" % (player.number)]
+        start_x, start_y = gameboard.start_points[player.number]
+        
         for current_piece in pieces.get_all_piece_states(player):
             for x in range(current_piece["arr"].shape[0]):
                 for y in range(current_piece["arr"].shape[1]):
@@ -273,22 +271,25 @@ def return_all_pending_moves(gameboard, player, mode = "ai"):
                             "arr": current_piece["arr"], "rotated": current_piece["rotated"], "place_on_board_at": pos})
                 if mode == "is_game_over" and len(pending_moves_list) > 0:
                     return pending_moves_list
-    if constants.VERBOSITY > 0 and len(pending_moves_list) > 0:
-        msg = "Pending moves are: %s" % (pending_moves_list)
-        print("Number of pending moves: %s" % (len(pending_moves_list)))
-    elif constants.VERBOSITY > 0 and len(pending_moves_list) == 0:
-        print("No more moves remain for player %s" % (player.number))
     return pending_moves_list
 
-def is_game_over(board, player1, player2):
-    if player1.is_1st_move or player2.is_1st_move:
-        return False
-    if not player1.remaining_pieces and not player2.remaining_pieces:
-        return True
-    if len(return_all_pending_moves(board, player1, "is_game_over")) == 0 and \
-       len(return_all_pending_moves(board, player2, "is_game_over")) == 0:
-        return True
-    return False
+def is_game_over(board, players_list):
+    """
+    Checks if game is over for a list of players (2 or 4).
+    Returns True only if ALL players are unable to move.
+    """
+    can_any_player_move = False
+    
+    for p in players_list:
+        if p.is_1st_move:
+            return False 
+        if p.remaining_pieces:
+             moves = return_all_pending_moves(board, p, "is_game_over")
+             if len(moves) > 0:
+                 can_any_player_move = True
+                 break
+    
+    return not can_any_player_move
 
 def scoring_fn(remaining_pieces):
     score = constants.STARTING_SCORE
@@ -305,10 +306,16 @@ def scoring_fn(remaining_pieces):
         score += 5
     return score
 
-def check_higher_score(player1, player2):
-    score1 = scoring_fn(player1.remaining_pieces)
-    score2 = scoring_fn(player2.remaining_pieces)
-
-    if score1 > score2: return player1
-    elif score2 > score1: return player2
-    else: return None #Draw
+def get_winners(players_list):
+    """
+    Returns a list of players with the highest score.
+    Handles 2-player and 4-player scenarios, including ties.
+    """
+    for p in players_list:
+        p.score = scoring_fn(p.remaining_pieces)
+        
+    max_score = max(p.score for p in players_list)
+    
+    winners = [p for p in players_list if p.score == max_score]
+    
+    return winners

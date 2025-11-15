@@ -25,8 +25,13 @@ def get_model(model):
         except:
             pass
 
-ROW_COUNT = 14
-COLUMN_COUNT = 14
+# Default 2 Player settings
+ROW_COUNT_2P = 14
+COLUMN_COUNT_2P = 14
+
+# Default 4 Player settings
+ROW_COUNT_4P = 20
+COLUMN_COUNT_4P = 20
 
 STARTING_SCORE = 89
 
@@ -37,10 +42,21 @@ WINDOW_SIZE = [WINDOW_WIDTH, WINDOW_HEIGHT]
 BOARD_FILL_VALUE = 0
 PLAYER1_VALUE = 1
 PLAYER2_VALUE = 2
+PLAYER3_VALUE = 3
+PLAYER4_VALUE = 4
 
-STARTING_PTS = \
-{"player1" : [4,4],
- "player2" : [9,9]}
+STARTING_SCORE = 89
+
+def get_start_points(rows, cols):
+    return {
+        1: [0, 0],             
+        2: [0, cols-1],        
+        3: [rows-1, cols-1],    
+        4: [rows-1, 0]
+    }
+
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 5555
 
 INFINITY = 10000
 M_INFINITY = -10000
@@ -53,6 +69,7 @@ def write_to_log(msg):
         f.close()
 
 from AI.MinimaxAI import Minimax
+from AI.MCTS_AI import MCTS 
 
 HUMAN_PARAMS = {"default_p1" : {"is_ai" : False, "color" : PURPLE, "name_if_ai" : None, "ai_class": None},
                 "default_p2" : {"is_ai" : False, "color" : ORANGE, "name_if_ai" : None, "ai_class": None}}
@@ -60,4 +77,7 @@ AI_PARAMS = {"randombot_p2" : {"is_ai" : True, "color" : ORANGE, "name_if_ai" : 
              "rlkeras_p2" : {"is_ai" : True, "color" : ORANGE, "name_if_ai" : "ReinforcementLearningAI", "ai_class": get_model("tf_keras")},
              "rltorch_p2" : {"is_ai" : True, "color" : ORANGE, "name_if_ai" : "ReinforcementLearningAI", "ai_class": get_model("torch")},
              "alphabeta_easy_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MinimaxAI", "ai_class": Minimax(ORANGE, 2, depth=1)},
-             "alphabeta_hard_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MinimaxAI", "ai_class": Minimax(ORANGE, 2, depth=2)}}
+             "alphabeta_hard_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MinimaxAI", "ai_class": Minimax(ORANGE, 2, depth=2)},
+             "mcts_easy_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MCTS_AI", "ai_class": MCTS(ORANGE, 2, iterations=100)},
+             "mcts_hard_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MCTS_AI", "ai_class": MCTS(ORANGE, 2, iterations=500)}
+            }
