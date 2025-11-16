@@ -17,7 +17,7 @@ Follow these steps in order:
 
 - Run the command: `ipconfig`
 
-- Look for your IPv4 Address. It will look something like 192.168.88.150.
+- Look for your IPv4 Address. It will look something like 192.168.88.151.
 
 - Give this IP address to the 3 other players. They will need it to connect.
 
@@ -47,7 +47,7 @@ Follow these steps in order:
 
 - Make sure you are on the same LAN/Wi-Fi as the Host.
 
-- Get the Host's IPv4 address (e.g., 192.168.88.150) from them.
+- Get the Host's IPv4 address (e.g., 192.168.88.151) from them.
 
 - Open a terminal and run the game:
 
