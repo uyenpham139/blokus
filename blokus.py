@@ -541,14 +541,6 @@ class GameManager:
                     action = button.handle_event(event)
                     if action == "vs_ai": return GameState.DIFFICULTY_MENU
                     if action == "online": 
-                        # --- Connect to server ---
-                        # self.net = Network(constants.DEFAULT_HOST, constants.DEFAULT_PORT)
-                        # self.local_client_id = self.net.connect()
-                        # if self.local_client_id:
-                        #     return GameState.ROOM_LIST # Go to new room list
-                        # else:
-                        #     print("Could not connect to server.")
-                        #     self.net = None
                         self.connect_popup_active = True
                         self.connect_error_msg = ""
                     if action == "continue":
