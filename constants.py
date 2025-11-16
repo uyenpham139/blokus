@@ -47,13 +47,21 @@ PLAYER4_VALUE = 4
 
 STARTING_SCORE = 89
 
-def get_start_points(rows, cols):
-    return {
-        1: [0, 0],             
-        2: [0, cols-1],        
-        3: [rows-1, cols-1],    
-        4: [rows-1, 0]
-    }
+def get_start_points(rows, cols, player_count=4):
+    if player_count == 2:
+        # 2-Player rule: Both players start from P1's corner
+        return {
+            1: [0, 0],
+            2: [rows-1, cols-1], 
+        }
+    else:
+        # 4-Player rule: One corner per player
+        return {
+            1: [0, 0],             
+            2: [0, cols-1],        
+            3: [rows-1, cols-1],    
+            4: [rows-1, 0]
+        }
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5555
@@ -78,6 +86,6 @@ AI_PARAMS = {"randombot_p2" : {"is_ai" : True, "color" : ORANGE, "name_if_ai" : 
              "rltorch_p2" : {"is_ai" : True, "color" : ORANGE, "name_if_ai" : "ReinforcementLearningAI", "ai_class": get_model("torch")},
              "alphabeta_easy_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MinimaxAI", "ai_class": Minimax(ORANGE, 2, depth=1)},
              "alphabeta_hard_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MinimaxAI", "ai_class": Minimax(ORANGE, 2, depth=2)},
-             "mcts_easy_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MCTS_AI", "ai_class": MCTS(ORANGE, 2, iterations=100)},
-             "mcts_hard_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MCTS_AI", "ai_class": MCTS(ORANGE, 2, iterations=500)}
+             "mcts_easy_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MCTS_AI", "ai_class": MCTS(ORANGE, 2, iterations=5)},
+             "mcts_hard_p2": {"is_ai": True, "color": ORANGE, "name_if_ai": "MCTS_AI", "ai_class": MCTS(ORANGE, 2, iterations=10)}
             }

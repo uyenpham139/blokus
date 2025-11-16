@@ -43,6 +43,38 @@ def get_all_piece_states(player = None):
                 list_pieces.append({"piece": piece, "arr": current_piece, "flipped": flip, "rotated": rot})
     return list_pieces
 
+def get_all_piece_states_for_one_piece(piece_name, piece_data):
+    """
+    Returns all orientation arrays for a single piece.
+    """
+    list_orientations = []
+    
+    original_arr = np.array(piece_data["arr"])
+    
+    current_piece = np.array(original_arr)
+    
+    for flip in range(piece_data["flips"]):
+        if flip == 1:
+            current_piece = np.flipud(original_arr)
+        else:
+            current_piece = np.array(original_arr)
+            
+        for rot in range(piece_data["rots"]):
+            if rot == 0:
+                current_piece_rotated = np.array(current_piece)
+            else:
+                # Rotate the *current* flip state
+                current_piece_rotated = np.rot90(current_piece_rotated, k=1)
+            
+            list_orientations.append({
+                "piece": piece_name, 
+                "arr": current_piece_rotated, 
+                "flipped": flip, 
+                "rotated": rot
+            })
+            
+    return list_orientations
+
 def get_piece_size(piece_name):
     all_pieces = get_pieces()
     if piece_name in all_pieces:

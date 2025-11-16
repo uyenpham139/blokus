@@ -4,13 +4,12 @@ import constants, pieces
 empty = constants.BOARD_FILL_VALUE
 
 class Board:
-    
-    def __init__(self, rows=constants.ROW_COUNT_2P, cols=constants.COLUMN_COUNT_2P):
+    def __init__(self, rows=constants.ROW_COUNT_2P, cols=constants.COLUMN_COUNT_2P, player_count=2):
         self.rows = rows
         self.cols = cols
         self.board = np.array([[constants.BOARD_FILL_VALUE for i in range(rows)] for j in range(cols)])
         self.turn_number = 1
-        self.start_points = constants.get_start_points(rows, cols)
+        self.start_points = constants.get_start_points(rows, cols, player_count)
     
     def fit_piece(self, piece_data, player, players_list=None):
         """
@@ -29,6 +28,7 @@ class Board:
         # 1. HANDLE FIRST MOVE (Dynamic Start Points)
         if player.is_1st_move:
             # Get start point for this specific player number (1-4)
+            # This will now correctly be [0,0] for both P1 and P2 in a 2P game
             target_pos = self.start_points[player.number]
             
             is_within_starting_pos = False
@@ -252,6 +252,7 @@ def return_all_pending_moves(gameboard, player, mode = "ai"):
     pending_moves_list = []
 
     if player.is_1st_move:
+        # This will now correctly be [0,0] for both P1 and P2 in a 2P game
         start_x, start_y = gameboard.start_points[player.number]
         
         for current_piece in pieces.get_all_piece_states(player):
@@ -260,9 +261,15 @@ def return_all_pending_moves(gameboard, player, mode = "ai"):
                     if current_piece["arr"][x][y] == 1:
                         board_x = start_x - x
                         board_y = start_y - y
-                        pending_moves_list.append({"piece": current_piece["piece"], \
-                            "flipped": current_piece["flipped"], "arr": current_piece["arr"], \
-                            "rotated": current_piece["rotated"], "place_on_board_at": [board_x, board_y]})
+                        
+                        # --- Add boundary check to prevent crashes ---
+                        if (board_x >= 0 and board_y >= 0 and 
+                            board_x + current_piece["arr"].shape[0] <= gameboard.rows and 
+                            board_y + current_piece["arr"].shape[1] <= gameboard.cols):
+                        
+                            pending_moves_list.append({"piece": current_piece["piece"], \
+                                "flipped": current_piece["flipped"], "arr": current_piece["arr"], \
+                                "rotated": current_piece["rotated"], "place_on_board_at": [board_x, board_y]})
     else:
         for current_piece in pieces.get_all_piece_states(player):
             board_positions = gameboard.validate_and_return_move_positions(current_piece["arr"], player)
@@ -273,23 +280,94 @@ def return_all_pending_moves(gameboard, player, mode = "ai"):
                     return pending_moves_list
     return pending_moves_list
 
+def check_if_player_can_move(gameboard, player):
+    """
+    A *smarter*, faster check to see if a player has *any* valid move.
+    It only checks piece placements against available corner locations.
+    """
+    if not player.remaining_pieces:
+        return False
+
+    if player.is_1st_move:
+        # Check if *any* piece can be placed on the start point
+        start_x, start_y = gameboard.start_points[player.number]
+        for piece_name in player.remaining_pieces.keys():
+            piece_data = player.remaining_pieces[piece_name]
+            # Use the helper function from pieces.py
+            orientations = pieces.get_all_piece_states_for_one_piece(piece_name, piece_data)
+            for state in orientations:
+                arr = state["arr"]
+                for x in range(arr.shape[0]):
+                    for y in range(arr.shape[1]):
+                        if arr[x][y] == 1:
+                            board_x, board_y = start_x - x, start_y - y
+                            # Check if it fits within bounds
+                            if (board_x >= 0 and board_y >= 0 and 
+                                board_x + arr.shape[0] <= gameboard.rows and 
+                                board_y + arr.shape[1] <= gameboard.cols):
+                                # This move is *possible*.
+                                return True
+        return False # No piece could be placed on start
+    
+    else:
+        # This is the main performance hog.
+        # Get all possible corners the player can play on.
+        all_corners = []
+        for corner_list in player.board_corners.values():
+            all_corners.extend(corner_list)
+        
+        if not all_corners:
+            return False # No corners, no moves.
+
+        # Now, for each remaining piece...
+        for piece_name in player.remaining_pieces.keys():
+            piece_data = player.remaining_pieces[piece_name]
+            orientations = pieces.get_all_piece_states_for_one_piece(piece_name, piece_data)
+            
+            # ...and each orientation...
+            for state in orientations:
+                arr = state["arr"]
+                # ...find all the blocks in that piece...
+                piece_blocks = []
+                for r in range(arr.shape[0]):
+                    for c in range(arr.shape[1]):
+                        if arr[r][c] == 1:
+                            piece_blocks.append((r, c))
+                
+                if not piece_blocks: continue
+
+                # ...and for each corner, try to place each block on it.
+                # Use a set to avoid re-checking the same placement
+                checked_placements = set() 
+                for corner_x, corner_y in all_corners:
+                    for anchor_r, anchor_c in piece_blocks:
+                        board_x = corner_x - anchor_r
+                        board_y = corner_y - anchor_c
+                        
+                        placement_key = (board_x, board_y, state["rotated"], state["flipped"])
+                        if placement_key in checked_placements:
+                            continue
+                        checked_placements.add(placement_key)
+
+                        # Now check if this placement is valid
+                        if gameboard.check_is_move_valid(arr, player, [board_x, board_y]):
+                            return True # Found one!
+        
+        return False
+
 def is_game_over(board, players_list):
     """
     Checks if game is over for a list of players (2 or 4).
     Returns True only if ALL players are unable to move.
+    
+    NOW USES THE FAST 'check_if_player_can_move' FUNCTION
     """
-    can_any_player_move = False
-    
     for p in players_list:
-        if p.is_1st_move:
+        # Use the fast check
+        if check_if_player_can_move(board, p):
             return False 
-        if p.remaining_pieces:
-             moves = return_all_pending_moves(board, p, "is_game_over")
-             if len(moves) > 0:
-                 can_any_player_move = True
-                 break
     
-    return not can_any_player_move
+    return True
 
 def scoring_fn(remaining_pieces):
     score = constants.STARTING_SCORE

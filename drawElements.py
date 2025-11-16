@@ -362,7 +362,8 @@ def draw_infobox_msg(canvas, msg_key):
     
     text_dict = {
         "not_valid_move": ("Invalid move. This piece cannot be placed there.", constants.RED),
-        "ai_turn": ("AI's turn. Evaluating next move...", constants.GREEN)
+        "ai_turn": ("AI's turn. Evaluating next move...", constants.GREEN),
+        "auto_skip": (f"No available moves. Skipping turn.", constants.ACCENT)
     }
 
     if msg_key in text_dict:
@@ -412,5 +413,64 @@ def draw_menu(canvas, title, buttons, mouse_pos):
     title_rect = title_surf.get_rect(center=(constants.WINDOW_WIDTH / 2, 150))
     canvas.blit(title_surf, title_rect)
 
+    for button in buttons:
+        button.draw(canvas, mouse_pos)
+        
+def draw_game_over_panel(canvas, text, button, mouse_pos):
+    """Draws a game over overlay with winner text and a back button."""
+    
+    overlay = pygame.Surface((constants.WINDOW_WIDTH, constants.WINDOW_HEIGHT))
+    overlay.set_alpha(200) # Make it dark (0-255)
+    overlay.fill((0, 0, 0))
+    canvas.blit(overlay, (0, 0))
+
+    cx, cy = constants.WINDOW_WIDTH // 2, constants.WINDOW_HEIGHT // 2
+    panel_w, panel_h = 600, 350
+    panel_rect = pygame.Rect(cx - panel_w//2, cy - panel_h//2, panel_w, panel_h)
+    
+    pygame.draw.rect(canvas, constants.BOARD_BACKGROUND, panel_rect, border_radius=15)
+    pygame.draw.rect(canvas, constants.WHITE, panel_rect, 2, border_radius=15)
+
+    font_title = pygame.font.SysFont("Trebuchet MS", 60)
+    font_sub = pygame.font.SysFont("Trebuchet MS", 40)
+    
+    parts = text.split('!')
+    
+    title_surf = font_title.render(parts[0] + "!", True, constants.RED)
+    title_rect = title_surf.get_rect(center=(cx, cy - 80))
+    canvas.blit(title_surf, title_rect)
+    
+    if len(parts) > 1:
+        sub_surf = font_sub.render(parts[1].strip(), True, constants.GREEN)
+        sub_rect = sub_surf.get_rect(center=(cx, cy - 10))
+        canvas.blit(sub_surf, sub_rect)
+
+    button.draw(canvas, mouse_pos)
+    
+def draw_pause_panel(canvas, buttons, mouse_pos):
+    """Draws a pause menu overlay with a title and buttons."""
+    
+    # Darken the background
+    overlay = pygame.Surface((constants.WINDOW_WIDTH, constants.WINDOW_HEIGHT))
+    overlay.set_alpha(200) # 0-255 transparency
+    overlay.fill((0, 0, 0))
+    canvas.blit(overlay, (0, 0))
+
+    # Panel dimensions
+    cx, cy = constants.WINDOW_WIDTH // 2, constants.WINDOW_HEIGHT // 2
+    panel_w, panel_h = 400, 300
+    panel_rect = pygame.Rect(cx - panel_w//2, cy - panel_h//2, panel_w, panel_h)
+    
+    # Draw the panel
+    pygame.draw.rect(canvas, constants.BOARD_BACKGROUND, panel_rect, border_radius=15)
+    pygame.draw.rect(canvas, constants.WHITE, panel_rect, 2, border_radius=15)
+
+    # Title
+    font_title = pygame.font.SysFont("Trebuchet MS", 60)
+    title_surf = font_title.render("Paused", True, constants.WHITE)
+    title_rect = title_surf.get_rect(center=(cx, cy - 80))
+    canvas.blit(title_surf, title_rect)
+    
+    # Draw all buttons passed to the function
     for button in buttons:
         button.draw(canvas, mouse_pos)
