@@ -460,8 +460,7 @@ class GameSession:
         
         # Re-calculate corners for all players
         all_players = self.players
-        for p in all_players:
-             self.gameboard.update_board_corners(p, all_players)
+        self.gameboard.update_board_corners(all_players)
 
 
 class GameManager:
@@ -482,6 +481,12 @@ class GameManager:
         self.popup_text_box = TextInputBox(440, 300, 400, 50, pygame.font.SysFont("Trebuchet MS", 30))
         self.popup_create_button = Button(540, 370, 200, 50, "Create", constants.GREEN, constants.ACCENT, "create_room_confirm")
         self.popup_close_button = Button(800, 240, 40, 40, "X", constants.RED, constants.ACCENT, "create_room_close")
+        
+        self.connect_popup_active = False
+        self.connect_error_msg = ""
+        self.ip_text_box = TextInputBox(440, 300, 400, 50, pygame.font.SysFont("Trebuchet MS", 30), text=constants.DEFAULT_HOST)
+        self.connect_button = Button(540, 370, 200, 50, "Connect", constants.GREEN, constants.ACCENT, "connect_confirm")
+        self.connect_close_button = Button(800, 240, 40, 40, "X", constants.RED, constants.ACCENT, "connect_close")
     
     def main_loop(self):
         while self.game_state != GameState.QUIT:
@@ -500,32 +505,90 @@ class GameManager:
     
     def main_menu_loop(self):
         buttons = [
-            Button(440, 200, 400, 60, "1 Player (vs AI)", constants.PURPLE, constants.ACCENT, "vs_ai"),
-            Button(440, 280, 400, 60, "4 Player (Online)", constants.GREEN, constants.ACCENT, "online"),
-            Button(440, 360, 400, 60, "Continue", constants.ORANGE, constants.ACCENT, "continue"),
-            Button(440, 440, 400, 60, "Quit", constants.RED, constants.ACCENT, "quit")
+            Button(440, 280, 400, 60, "1 Player (vs AI)", constants.PURPLE, constants.ACCENT, "vs_ai"),
+            Button(440, 360, 400, 60, "4 Player (Online)", constants.GREEN, constants.ACCENT, "online"),
+            Button(440, 440, 400, 60, "Continue", constants.ORANGE, constants.ACCENT, "continue"),
+            Button(440, 520, 400, 60, "Quit", constants.RED, constants.ACCENT, "quit")
         ]
         while True:
             mouse_pos = pygame.mouse.get_pos()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: return GameState.QUIT
+                
+                # Connection
+                if self.connect_popup_active:
+                    self.ip_text_box.handle_event(event)
+                    
+                    if self.connect_button.handle_event(event) == "connect_confirm":
+                        server_ip = self.ip_text_box.text
+                        print(f"Attempting to connect to {server_ip}...")
+                        self.net = Network(server_ip, constants.DEFAULT_PORT)
+                        self.local_client_id = self.net.connect()
+                        
+                        if self.local_client_id:
+                            print(f"Success! Connected as Client ID: {self.local_client_id}")
+                            self.connect_popup_active = False
+                            return GameState.ROOM_LIST # Go to room list
+                        else:
+                            print("Could not connect to server.")
+                            self.connect_error_msg = "Connection Failed!"
+                            self.net = None
+                            
+                    if self.connect_close_button.handle_event(event) == "connect_close":
+                         self.connect_popup_active = False
+                         
                 for button in buttons:
                     action = button.handle_event(event)
                     if action == "vs_ai": return GameState.DIFFICULTY_MENU
                     if action == "online": 
                         # --- Connect to server ---
-                        self.net = Network(constants.DEFAULT_HOST, constants.DEFAULT_PORT)
-                        self.local_client_id = self.net.connect()
-                        if self.local_client_id:
-                            return GameState.ROOM_LIST # Go to new room list
-                        else:
-                            print("Could not connect to server.")
-                            self.net = None
+                        # self.net = Network(constants.DEFAULT_HOST, constants.DEFAULT_PORT)
+                        # self.local_client_id = self.net.connect()
+                        # if self.local_client_id:
+                        #     return GameState.ROOM_LIST # Go to new room list
+                        # else:
+                        #     print("Could not connect to server.")
+                        #     self.net = None
+                        self.connect_popup_active = True
+                        self.connect_error_msg = ""
                     if action == "continue":
                         if self.load_game_state():
                             return GameState.GAMEPLAY
                     if action == "quit": return GameState.QUIT
             drawElements.draw_menu(self.screen, "Blokus", buttons, mouse_pos)
+            
+            if self.connect_popup_active:
+                # Darken background
+                s = pygame.Surface((constants.WINDOW_WIDTH, constants.WINDOW_HEIGHT))
+                s.set_alpha(200)
+                s.fill(constants.BLACK)
+                self.screen.blit(s, (0,0))
+                
+                # Draw popup box
+                popup_rect = pygame.Rect(400, 200, 480, 300)
+                pygame.draw.rect(self.screen, constants.BOARD_BACKGROUND, popup_rect, border_radius=12)
+                pygame.draw.rect(self.screen, constants.WHITE, popup_rect, 2, border_radius=12)
+                
+                font = pygame.font.SysFont("Trebuchet MS", 30)
+                
+                title = font.render("Connect to Server", True, constants.WHITE)
+                self.screen.blit(title, (popup_rect.x + 20, popup_rect.y + 20))
+                label = font.render("Server IP:", True, constants.WHITE)
+                self.screen.blit(label, (popup_rect.x + 20, popup_rect.y + 80))
+                
+                self.ip_text_box.rect.topleft = (popup_rect.x + 20, popup_rect.y + 130)
+                self.connect_button.rect.center = (popup_rect.centerx, popup_rect.y + 230)
+                self.connect_close_button.rect.topright = (popup_rect.right - 10, popup_rect.top + 10)
+                
+                self.ip_text_box.draw(self.screen)
+                self.connect_button.draw(self.screen, mouse_pos)
+                self.connect_close_button.draw(self.screen, mouse_pos)
+                
+                if self.connect_error_msg:
+                    err_font = pygame.font.SysFont("Trebuchet MS", 25)
+                    err_surf = err_font.render(self.connect_error_msg, True, constants.RED)
+                    self.screen.blit(err_surf, (popup_rect.x + 20, popup_rect.y + 180))
+                    
             pygame.display.update()
             
     def room_list_loop(self):
